@@ -1051,7 +1051,7 @@ impl Container {
         };
     }
     /// EXPERIMENTAL API! Subject to change/removal at any time.
-    /// Configures the provided list of devices to be accesible to this container.
+    /// Configures the provided list of devices to be accessible to this container.
     /// This currently works for Nvidia devices only.
     ///
     /// # Arguments
@@ -2624,6 +2624,12 @@ pub struct DirectoryEntriesOpts<'a> {
     pub path: Option<&'a str>,
 }
 #[derive(Builder, Debug, PartialEq)]
+pub struct DirectoryExportOpts {
+    /// If true, then the host directory will be wiped clean before exporting so that it exactly matches the directory being exported; this means it will delete any files on the host that aren't in the exported dir. If false (the default), the contents of the directory will be merged with any existing contents of the host directory, leaving any existing files on the host that aren't in the exported directory alone.
+    #[builder(setter(into, strip_option), default)]
+    pub wipe: Option<bool>,
+}
+#[derive(Builder, Debug, PartialEq)]
 pub struct DirectoryPipelineOpts<'a> {
     /// Description of the sub-pipeline.
     #[builder(setter(into, strip_option), default)]
@@ -2799,9 +2805,28 @@ impl Directory {
     /// # Arguments
     ///
     /// * `path` - Location of the copied directory (e.g., "logs/").
+    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
     pub async fn export(&self, path: impl Into<String>) -> Result<bool, DaggerError> {
         let mut query = self.selection.select("export");
         query = query.arg("path", path.into());
+        query.execute(self.graphql_client.clone()).await
+    }
+    /// Writes the contents of the directory to a path on the host.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Location of the copied directory (e.g., "logs/").
+    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
+    pub async fn export_opts(
+        &self,
+        path: impl Into<String>,
+        opts: DirectoryExportOpts,
+    ) -> Result<bool, DaggerError> {
+        let mut query = self.selection.select("export");
+        query = query.arg("path", path.into());
+        if let Some(wipe) = opts.wipe {
+            query = query.arg("wipe", wipe);
+        }
         query.execute(self.graphql_client.clone()).await
     }
     /// Retrieves a file at the given path.
@@ -4751,7 +4776,7 @@ pub struct QueryContainerOpts {
 }
 #[derive(Builder, Debug, PartialEq)]
 pub struct QueryDirectoryOpts {
-    /// DEPRECATED: Use `loadDirectoryFromID` isntead.
+    /// DEPRECATED: Use `loadDirectoryFromID` instead.
     #[builder(setter(into, strip_option), default)]
     pub id: Option<DirectoryId>,
 }
@@ -5841,6 +5866,11 @@ impl Secret {
     /// A unique identifier for this Secret.
     pub async fn id(&self) -> Result<SecretId, DaggerError> {
         let query = self.selection.select("id");
+        query.execute(self.graphql_client.clone()).await
+    }
+    /// The name of this secret.
+    pub async fn name(&self) -> Result<String, DaggerError> {
+        let query = self.selection.select("name");
         query.execute(self.graphql_client.clone()).await
     }
     /// The value of this secret.

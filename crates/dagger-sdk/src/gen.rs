@@ -1329,6 +1329,41 @@ impl SocketId {
     }
 }
 #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
+pub struct SourceMapId(pub String);
+impl From<&str> for SourceMapId {
+    fn from(value: &str) -> Self {
+        Self(value.to_string())
+    }
+}
+impl From<String> for SourceMapId {
+    fn from(value: String) -> Self {
+        Self(value)
+    }
+}
+impl IntoID<SourceMapId> for SourceMap {
+    fn into_id(
+        self,
+    ) -> std::pin::Pin<
+        Box<dyn core::future::Future<Output = Result<SourceMapId, DaggerError>> + Send>,
+    > {
+        Box::pin(async move { self.id().await })
+    }
+}
+impl IntoID<SourceMapId> for SourceMapId {
+    fn into_id(
+        self,
+    ) -> std::pin::Pin<
+        Box<dyn core::future::Future<Output = Result<SourceMapId, DaggerError>> + Send>,
+    > {
+        Box::pin(async move { Ok::<SourceMapId, DaggerError>(self) })
+    }
+}
+impl SourceMapId {
+    fn quote(&self) -> String {
+        format!("\"{}\"", self.0.clone())
+    }
+}
+#[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
 pub struct TerminalId(pub String);
 impl From<&str> for TerminalId {
     fn from(value: &str) -> Self {
@@ -1479,7 +1514,16 @@ pub struct ContainerBuildOpts<'a> {
     pub target: Option<&'a str>,
 }
 #[derive(Builder, Debug, PartialEq)]
+pub struct ContainerDirectoryOpts {
+    /// Replace "${VAR}" or "$VAR" in the value of path according to the current environment variables defined in the container (e.g. "/$VAR/foo").
+    #[builder(setter(into, strip_option), default)]
+    pub expand: Option<bool>,
+}
+#[derive(Builder, Debug, PartialEq)]
 pub struct ContainerExportOpts {
+    /// Replace "${VAR}" or "$VAR" in the value of path according to the current environment variables defined in the container (e.g. "/$VAR/foo").
+    #[builder(setter(into, strip_option), default)]
+    pub expand: Option<bool>,
     /// Force each layer of the exported image to use the specified compression algorithm.
     /// If this is unset, then if a layer already has a compressed blob in the engine's cache, that will be used (this can result in a mix of compression algorithms for different layers). If this is unset and a layer has no compressed blob in the engine's cache, then it will be compressed using Gzip.
     #[builder(setter(into, strip_option), default)]
@@ -1494,19 +1538,16 @@ pub struct ContainerExportOpts {
     pub platform_variants: Option<Vec<ContainerId>>,
 }
 #[derive(Builder, Debug, PartialEq)]
+pub struct ContainerFileOpts {
+    /// Replace "${VAR}" or "$VAR" in the value of path according to the current environment variables defined in the container (e.g. "/$VAR/foo.txt").
+    #[builder(setter(into, strip_option), default)]
+    pub expand: Option<bool>,
+}
+#[derive(Builder, Debug, PartialEq)]
 pub struct ContainerImportOpts<'a> {
     /// Identifies the tag to import from the archive, if the archive bundles multiple tags.
     #[builder(setter(into, strip_option), default)]
     pub tag: Option<&'a str>,
-}
-#[derive(Builder, Debug, PartialEq)]
-pub struct ContainerPipelineOpts<'a> {
-    /// Description of the sub-pipeline.
-    #[builder(setter(into, strip_option), default)]
-    pub description: Option<&'a str>,
-    /// Labels to apply to the sub-pipeline.
-    #[builder(setter(into, strip_option), default)]
-    pub labels: Option<Vec<PipelineLabel>>,
 }
 #[derive(Builder, Debug, PartialEq)]
 pub struct ContainerPublishOpts {
@@ -1537,6 +1578,16 @@ pub struct ContainerTerminalOpts<'a> {
     pub insecure_root_capabilities: Option<bool>,
 }
 #[derive(Builder, Debug, PartialEq)]
+pub struct ContainerUpOpts {
+    /// List of frontend/backend port mappings to forward.
+    /// Frontend is the port accepting traffic on the host, backend is the service port.
+    #[builder(setter(into, strip_option), default)]
+    pub ports: Option<Vec<PortForward>>,
+    /// Bind each tunnel port to a random port on the host.
+    #[builder(setter(into, strip_option), default)]
+    pub random: Option<bool>,
+}
+#[derive(Builder, Debug, PartialEq)]
 pub struct ContainerWithDefaultTerminalCmdOpts {
     /// Provides Dagger access to the executed command.
     /// Do not use this option unless you trust the command being executed; the command being executed WILL BE GRANTED FULL ACCESS TO YOUR HOST FILESYSTEM.
@@ -1551,6 +1602,9 @@ pub struct ContainerWithDirectoryOpts<'a> {
     /// Patterns to exclude in the written directory (e.g. ["node_modules/**", ".gitignore", ".git/"]).
     #[builder(setter(into, strip_option), default)]
     pub exclude: Option<Vec<&'a str>>,
+    /// Replace "${VAR}" or "$VAR" in the value of path according to the current environment variables defined in the container (e.g. "/$VAR/foo").
+    #[builder(setter(into, strip_option), default)]
+    pub expand: Option<bool>,
     /// Patterns to include in the written directory (e.g. ["*.go", "go.mod", "go.sum"]).
     #[builder(setter(into, strip_option), default)]
     pub include: Option<Vec<&'a str>>,
@@ -1568,12 +1622,18 @@ pub struct ContainerWithEntrypointOpts {
 }
 #[derive(Builder, Debug, PartialEq)]
 pub struct ContainerWithEnvVariableOpts {
-    /// Replace `${VAR}` or `$VAR` in the value according to the current environment variables defined in the container (e.g., "/opt/bin:$PATH").
+    /// Replace "${VAR}" or "$VAR" in the value according to the current environment variables defined in the container (e.g. "/opt/bin:$PATH").
     #[builder(setter(into, strip_option), default)]
     pub expand: Option<bool>,
 }
 #[derive(Builder, Debug, PartialEq)]
 pub struct ContainerWithExecOpts<'a> {
+    /// Replace "${VAR}" or "$VAR" in the args according to the current environment variables defined in the container (e.g. "/$VAR/foo").
+    #[builder(setter(into, strip_option), default)]
+    pub expand: Option<bool>,
+    /// Exit codes this command is allowed to exit with without error
+    #[builder(setter(into, strip_option), default)]
+    pub expect: Option<ReturnType>,
     /// Provides Dagger access to the executed command.
     /// Do not use this option unless you trust the command being executed; the command being executed WILL BE GRANTED FULL ACCESS TO YOUR HOST FILESYSTEM.
     #[builder(setter(into, strip_option), default)]
@@ -1581,15 +1641,16 @@ pub struct ContainerWithExecOpts<'a> {
     /// Execute the command with all root capabilities. This is similar to running a command with "sudo" or executing "docker run" with the "--privileged" flag. Containerization does not provide any security guarantees when using this option. It should only be used when absolutely necessary and only with trusted commands.
     #[builder(setter(into, strip_option), default)]
     pub insecure_root_capabilities: Option<bool>,
+    /// If set, skip the automatic init process injected into containers by default.
+    /// This should only be used if the user requires that their exec process be the pid 1 process in the container. Otherwise it may result in unexpected behavior.
+    #[builder(setter(into, strip_option), default)]
+    pub no_init: Option<bool>,
     /// Redirect the command's standard error to a file in the container (e.g., "/tmp/stderr").
     #[builder(setter(into, strip_option), default)]
     pub redirect_stderr: Option<&'a str>,
     /// Redirect the command's standard output to a file in the container (e.g., "/tmp/stdout").
     #[builder(setter(into, strip_option), default)]
     pub redirect_stdout: Option<&'a str>,
-    /// DEPRECATED: For true this can be removed. For false, use `useEntrypoint` instead.
-    #[builder(setter(into, strip_option), default)]
-    pub skip_entrypoint: Option<bool>,
     /// Content to write to the command's standard input before closing (e.g., "Hello world").
     #[builder(setter(into, strip_option), default)]
     pub stdin: Option<&'a str>,
@@ -1611,6 +1672,9 @@ pub struct ContainerWithExposedPortOpts<'a> {
 }
 #[derive(Builder, Debug, PartialEq)]
 pub struct ContainerWithFileOpts<'a> {
+    /// Replace "${VAR}" or "$VAR" in the value of path according to the current environment variables defined in the container (e.g. "/$VAR/foo.txt").
+    #[builder(setter(into, strip_option), default)]
+    pub expand: Option<bool>,
     /// A user:group to set for the file.
     /// The user and group can either be an ID (1000:1000) or a name (foo:bar).
     /// If the group is omitted, it defaults to the same as the user.
@@ -1622,6 +1686,9 @@ pub struct ContainerWithFileOpts<'a> {
 }
 #[derive(Builder, Debug, PartialEq)]
 pub struct ContainerWithFilesOpts<'a> {
+    /// Replace "${VAR}" or "$VAR" in the value of path according to the current environment variables defined in the container (e.g. "/$VAR/foo.txt").
+    #[builder(setter(into, strip_option), default)]
+    pub expand: Option<bool>,
     /// A user:group to set for the files.
     /// The user and group can either be an ID (1000:1000) or a name (foo:bar).
     /// If the group is omitted, it defaults to the same as the user.
@@ -1633,6 +1700,9 @@ pub struct ContainerWithFilesOpts<'a> {
 }
 #[derive(Builder, Debug, PartialEq)]
 pub struct ContainerWithMountedCacheOpts<'a> {
+    /// Replace "${VAR}" or "$VAR" in the value of path according to the current environment variables defined in the container (e.g. "/$VAR/foo").
+    #[builder(setter(into, strip_option), default)]
+    pub expand: Option<bool>,
     /// A user:group to set for the mounted cache directory.
     /// Note that this changes the ownership of the specified mount along with the initial filesystem provided by source (if any). It does not have any effect if/when the cache has already been created.
     /// The user and group can either be an ID (1000:1000) or a name (foo:bar).
@@ -1648,6 +1718,9 @@ pub struct ContainerWithMountedCacheOpts<'a> {
 }
 #[derive(Builder, Debug, PartialEq)]
 pub struct ContainerWithMountedDirectoryOpts<'a> {
+    /// Replace "${VAR}" or "$VAR" in the value of path according to the current environment variables defined in the container (e.g. "/$VAR/foo").
+    #[builder(setter(into, strip_option), default)]
+    pub expand: Option<bool>,
     /// A user:group to set for the mounted directory and its contents.
     /// The user and group can either be an ID (1000:1000) or a name (foo:bar).
     /// If the group is omitted, it defaults to the same as the user.
@@ -1656,6 +1729,9 @@ pub struct ContainerWithMountedDirectoryOpts<'a> {
 }
 #[derive(Builder, Debug, PartialEq)]
 pub struct ContainerWithMountedFileOpts<'a> {
+    /// Replace "${VAR}" or "$VAR" in the value of path according to the current environment variables defined in the container (e.g. "/$VAR/foo.txt").
+    #[builder(setter(into, strip_option), default)]
+    pub expand: Option<bool>,
     /// A user or user:group to set for the mounted file.
     /// The user and group can either be an ID (1000:1000) or a name (foo:bar).
     /// If the group is omitted, it defaults to the same as the user.
@@ -1664,6 +1740,9 @@ pub struct ContainerWithMountedFileOpts<'a> {
 }
 #[derive(Builder, Debug, PartialEq)]
 pub struct ContainerWithMountedSecretOpts<'a> {
+    /// Replace "${VAR}" or "$VAR" in the value of path according to the current environment variables defined in the container (e.g. "/$VAR/foo").
+    #[builder(setter(into, strip_option), default)]
+    pub expand: Option<bool>,
     /// Permission given to the mounted secret (e.g., 0600).
     /// This option requires an owner to be set to be active.
     #[builder(setter(into, strip_option), default)]
@@ -1675,7 +1754,19 @@ pub struct ContainerWithMountedSecretOpts<'a> {
     pub owner: Option<&'a str>,
 }
 #[derive(Builder, Debug, PartialEq)]
+pub struct ContainerWithMountedTempOpts {
+    /// Replace "${VAR}" or "$VAR" in the value of path according to the current environment variables defined in the container (e.g. "/$VAR/foo").
+    #[builder(setter(into, strip_option), default)]
+    pub expand: Option<bool>,
+    /// Size of the temporary directory in bytes.
+    #[builder(setter(into, strip_option), default)]
+    pub size: Option<isize>,
+}
+#[derive(Builder, Debug, PartialEq)]
 pub struct ContainerWithNewFileOpts<'a> {
+    /// Replace "${VAR}" or "$VAR" in the value of path according to the current environment variables defined in the container (e.g. "/$VAR/foo.txt").
+    #[builder(setter(into, strip_option), default)]
+    pub expand: Option<bool>,
     /// A user:group to set for the file.
     /// The user and group can either be an ID (1000:1000) or a name (foo:bar).
     /// If the group is omitted, it defaults to the same as the user.
@@ -1687,11 +1778,26 @@ pub struct ContainerWithNewFileOpts<'a> {
 }
 #[derive(Builder, Debug, PartialEq)]
 pub struct ContainerWithUnixSocketOpts<'a> {
+    /// Replace "${VAR}" or "$VAR" in the value of path according to the current environment variables defined in the container (e.g. "/$VAR/foo").
+    #[builder(setter(into, strip_option), default)]
+    pub expand: Option<bool>,
     /// A user:group to set for the mounted socket.
     /// The user and group can either be an ID (1000:1000) or a name (foo:bar).
     /// If the group is omitted, it defaults to the same as the user.
     #[builder(setter(into, strip_option), default)]
     pub owner: Option<&'a str>,
+}
+#[derive(Builder, Debug, PartialEq)]
+pub struct ContainerWithWorkdirOpts {
+    /// Replace "${VAR}" or "$VAR" in the value of path according to the current environment variables defined in the container (e.g. "/$VAR/foo").
+    #[builder(setter(into, strip_option), default)]
+    pub expand: Option<bool>,
+}
+#[derive(Builder, Debug, PartialEq)]
+pub struct ContainerWithoutDirectoryOpts {
+    /// Replace "${VAR}" or "$VAR" in the value of path according to the current environment variables defined in the container (e.g. "/$VAR/foo").
+    #[builder(setter(into, strip_option), default)]
+    pub expand: Option<bool>,
 }
 #[derive(Builder, Debug, PartialEq)]
 pub struct ContainerWithoutEntrypointOpts {
@@ -1704,6 +1810,30 @@ pub struct ContainerWithoutExposedPortOpts {
     /// Port protocol to unexpose
     #[builder(setter(into, strip_option), default)]
     pub protocol: Option<NetworkProtocol>,
+}
+#[derive(Builder, Debug, PartialEq)]
+pub struct ContainerWithoutFileOpts {
+    /// Replace "${VAR}" or "$VAR" in the value of path according to the current environment variables defined in the container (e.g. "/$VAR/foo.txt").
+    #[builder(setter(into, strip_option), default)]
+    pub expand: Option<bool>,
+}
+#[derive(Builder, Debug, PartialEq)]
+pub struct ContainerWithoutFilesOpts {
+    /// Replace "${VAR}" or "$VAR" in the value of paths according to the current environment variables defined in the container (e.g. "/$VAR/foo.txt").
+    #[builder(setter(into, strip_option), default)]
+    pub expand: Option<bool>,
+}
+#[derive(Builder, Debug, PartialEq)]
+pub struct ContainerWithoutMountOpts {
+    /// Replace "${VAR}" or "$VAR" in the value of path according to the current environment variables defined in the container (e.g. "/$VAR/foo").
+    #[builder(setter(into, strip_option), default)]
+    pub expand: Option<bool>,
+}
+#[derive(Builder, Debug, PartialEq)]
+pub struct ContainerWithoutUnixSocketOpts {
+    /// Replace "${VAR}" or "$VAR" in the value of path according to the current environment variables defined in the container (e.g. "/$VAR/foo").
+    #[builder(setter(into, strip_option), default)]
+    pub expand: Option<bool>,
 }
 impl Container {
     /// Turn the container into a Service.
@@ -1820,9 +1950,33 @@ impl Container {
     /// # Arguments
     ///
     /// * `path` - The path of the directory to retrieve (e.g., "./src").
+    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
     pub fn directory(&self, path: impl Into<String>) -> Directory {
         let mut query = self.selection.select("directory");
         query = query.arg("path", path.into());
+        Directory {
+            proc: self.proc.clone(),
+            selection: query,
+            graphql_client: self.graphql_client.clone(),
+        }
+    }
+    /// Retrieves a directory at the given path.
+    /// Mounts are included.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The path of the directory to retrieve (e.g., "./src").
+    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
+    pub fn directory_opts(
+        &self,
+        path: impl Into<String>,
+        opts: ContainerDirectoryOpts,
+    ) -> Directory {
+        let mut query = self.selection.select("directory");
+        query = query.arg("path", path.into());
+        if let Some(expand) = opts.expand {
+            query = query.arg("expand", expand);
+        }
         Directory {
             proc: self.proc.clone(),
             selection: query,
@@ -1852,6 +2006,12 @@ impl Container {
             selection: query,
             graphql_client: self.graphql_client.clone(),
         }]
+    }
+    /// The exit code of the last executed command.
+    /// Returns an error if no command was set.
+    pub async fn exit_code(&self) -> Result<isize, DaggerError> {
+        let query = self.selection.select("exitCode");
+        query.execute(self.graphql_client.clone()).await
     }
     /// EXPERIMENTAL API! Subject to change/removal at any time.
     /// Configures all available GPUs on the host to be accessible to this container.
@@ -1925,6 +2085,9 @@ impl Container {
         if let Some(media_types) = opts.media_types {
             query = query.arg("mediaTypes", media_types);
         }
+        if let Some(expand) = opts.expand {
+            query = query.arg("expand", expand);
+        }
         query.execute(self.graphql_client.clone()).await
     }
     /// Retrieves the list of exposed ports.
@@ -1943,9 +2106,29 @@ impl Container {
     /// # Arguments
     ///
     /// * `path` - The path of the file to retrieve (e.g., "./README.md").
+    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
     pub fn file(&self, path: impl Into<String>) -> File {
         let mut query = self.selection.select("file");
         query = query.arg("path", path.into());
+        File {
+            proc: self.proc.clone(),
+            selection: query,
+            graphql_client: self.graphql_client.clone(),
+        }
+    }
+    /// Retrieves a file at the given path.
+    /// Mounts are included.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The path of the file to retrieve (e.g., "./README.md").
+    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
+    pub fn file_opts(&self, path: impl Into<String>, opts: ContainerFileOpts) -> File {
+        let mut query = self.selection.select("file");
+        query = query.arg("path", path.into());
+        if let Some(expand) = opts.expand {
+            query = query.arg("expand", expand);
+        }
         File {
             proc: self.proc.clone(),
             selection: query,
@@ -2051,46 +2234,6 @@ impl Container {
         let query = self.selection.select("mounts");
         query.execute(self.graphql_client.clone()).await
     }
-    /// Creates a named sub-pipeline.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - Name of the sub-pipeline.
-    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
-    pub fn pipeline(&self, name: impl Into<String>) -> Container {
-        let mut query = self.selection.select("pipeline");
-        query = query.arg("name", name.into());
-        Container {
-            proc: self.proc.clone(),
-            selection: query,
-            graphql_client: self.graphql_client.clone(),
-        }
-    }
-    /// Creates a named sub-pipeline.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - Name of the sub-pipeline.
-    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
-    pub fn pipeline_opts<'a>(
-        &self,
-        name: impl Into<String>,
-        opts: ContainerPipelineOpts<'a>,
-    ) -> Container {
-        let mut query = self.selection.select("pipeline");
-        query = query.arg("name", name.into());
-        if let Some(description) = opts.description {
-            query = query.arg("description", description);
-        }
-        if let Some(labels) = opts.labels {
-            query = query.arg("labels", labels);
-        }
-        Container {
-            proc: self.proc.clone(),
-            selection: query,
-            graphql_client: self.graphql_client.clone(),
-        }
-    }
     /// The platform this container executes and publishes as.
     pub async fn platform(&self) -> Result<Platform, DaggerError> {
         let query = self.selection.select("platform");
@@ -2149,13 +2292,13 @@ impl Container {
         }
     }
     /// The error stream of the last executed command.
-    /// Will execute default command if none is set, or error if there's no default.
+    /// Returns an error if no command was set.
     pub async fn stderr(&self) -> Result<String, DaggerError> {
         let query = self.selection.select("stderr");
         query.execute(self.graphql_client.clone()).await
     }
     /// The output stream of the last executed command.
-    /// Will execute default command if none is set, or error if there's no default.
+    /// Returns an error if no command was set.
     pub async fn stdout(&self) -> Result<String, DaggerError> {
         let query = self.selection.select("stdout");
         query.execute(self.graphql_client.clone()).await
@@ -2204,10 +2347,52 @@ impl Container {
             graphql_client: self.graphql_client.clone(),
         }
     }
+    /// Starts a Service and creates a tunnel that forwards traffic from the caller's network to that service.
+    /// Be sure to set any exposed ports before calling this api.
+    ///
+    /// # Arguments
+    ///
+    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
+    pub async fn up(&self) -> Result<Void, DaggerError> {
+        let query = self.selection.select("up");
+        query.execute(self.graphql_client.clone()).await
+    }
+    /// Starts a Service and creates a tunnel that forwards traffic from the caller's network to that service.
+    /// Be sure to set any exposed ports before calling this api.
+    ///
+    /// # Arguments
+    ///
+    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
+    pub async fn up_opts(&self, opts: ContainerUpOpts) -> Result<Void, DaggerError> {
+        let mut query = self.selection.select("up");
+        if let Some(ports) = opts.ports {
+            query = query.arg("ports", ports);
+        }
+        if let Some(random) = opts.random {
+            query = query.arg("random", random);
+        }
+        query.execute(self.graphql_client.clone()).await
+    }
     /// Retrieves the user to be set for all commands.
     pub async fn user(&self) -> Result<String, DaggerError> {
         let query = self.selection.select("user");
         query.execute(self.graphql_client.clone()).await
+    }
+    /// Retrieves this container plus the given OCI anotation.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of the annotation.
+    /// * `value` - The value of the annotation.
+    pub fn with_annotation(&self, name: impl Into<String>, value: impl Into<String>) -> Container {
+        let mut query = self.selection.select("withAnnotation");
+        query = query.arg("name", name.into());
+        query = query.arg("value", value.into());
+        Container {
+            proc: self.proc.clone(),
+            selection: query,
+            graphql_client: self.graphql_client.clone(),
+        }
     }
     /// Configures default arguments for future commands.
     ///
@@ -2332,6 +2517,9 @@ impl Container {
         }
         if let Some(owner) = opts.owner {
             query = query.arg("owner", owner);
+        }
+        if let Some(expand) = opts.expand {
+            query = query.arg("expand", expand);
         }
         Container {
             proc: self.proc.clone(),
@@ -2466,9 +2654,6 @@ impl Container {
             "args",
             args.into_iter().map(|i| i.into()).collect::<Vec<String>>(),
         );
-        if let Some(skip_entrypoint) = opts.skip_entrypoint {
-            query = query.arg("skipEntrypoint", skip_entrypoint);
-        }
         if let Some(use_entrypoint) = opts.use_entrypoint {
             query = query.arg("useEntrypoint", use_entrypoint);
         }
@@ -2481,6 +2666,9 @@ impl Container {
         if let Some(redirect_stderr) = opts.redirect_stderr {
             query = query.arg("redirectStderr", redirect_stderr);
         }
+        if let Some(expect) = opts.expect {
+            query = query.arg("expect", expect);
+        }
         if let Some(experimental_privileged_nesting) = opts.experimental_privileged_nesting {
             query = query.arg(
                 "experimentalPrivilegedNesting",
@@ -2489,6 +2677,12 @@ impl Container {
         }
         if let Some(insecure_root_capabilities) = opts.insecure_root_capabilities {
             query = query.arg("insecureRootCapabilities", insecure_root_capabilities);
+        }
+        if let Some(expand) = opts.expand {
+            query = query.arg("expand", expand);
+        }
+        if let Some(no_init) = opts.no_init {
+            query = query.arg("noInit", no_init);
         }
         Container {
             proc: self.proc.clone(),
@@ -2596,6 +2790,9 @@ impl Container {
         if let Some(owner) = opts.owner {
             query = query.arg("owner", owner);
         }
+        if let Some(expand) = opts.expand {
+            query = query.arg("expand", expand);
+        }
         Container {
             proc: self.proc.clone(),
             selection: query,
@@ -2640,6 +2837,9 @@ impl Container {
         }
         if let Some(owner) = opts.owner {
             query = query.arg("owner", owner);
+        }
+        if let Some(expand) = opts.expand {
+            query = query.arg("expand", expand);
         }
         Container {
             proc: self.proc.clone(),
@@ -2730,6 +2930,9 @@ impl Container {
         if let Some(owner) = opts.owner {
             query = query.arg("owner", owner);
         }
+        if let Some(expand) = opts.expand {
+            query = query.arg("expand", expand);
+        }
         Container {
             proc: self.proc.clone(),
             selection: query,
@@ -2788,6 +2991,9 @@ impl Container {
         if let Some(owner) = opts.owner {
             query = query.arg("owner", owner);
         }
+        if let Some(expand) = opts.expand {
+            query = query.arg("expand", expand);
+        }
         Container {
             proc: self.proc.clone(),
             selection: query,
@@ -2845,6 +3051,9 @@ impl Container {
         );
         if let Some(owner) = opts.owner {
             query = query.arg("owner", owner);
+        }
+        if let Some(expand) = opts.expand {
+            query = query.arg("expand", expand);
         }
         Container {
             proc: self.proc.clone(),
@@ -2907,6 +3116,9 @@ impl Container {
         if let Some(mode) = opts.mode {
             query = query.arg("mode", mode);
         }
+        if let Some(expand) = opts.expand {
+            query = query.arg("expand", expand);
+        }
         Container {
             proc: self.proc.clone(),
             selection: query,
@@ -2918,9 +3130,35 @@ impl Container {
     /// # Arguments
     ///
     /// * `path` - Location of the temporary directory (e.g., "/tmp/temp_dir").
+    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
     pub fn with_mounted_temp(&self, path: impl Into<String>) -> Container {
         let mut query = self.selection.select("withMountedTemp");
         query = query.arg("path", path.into());
+        Container {
+            proc: self.proc.clone(),
+            selection: query,
+            graphql_client: self.graphql_client.clone(),
+        }
+    }
+    /// Retrieves this container plus a temporary directory mounted at the given path. Any writes will be ephemeral to a single withExec call; they will not be persisted to subsequent withExecs.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Location of the temporary directory (e.g., "/tmp/temp_dir").
+    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
+    pub fn with_mounted_temp_opts(
+        &self,
+        path: impl Into<String>,
+        opts: ContainerWithMountedTempOpts,
+    ) -> Container {
+        let mut query = self.selection.select("withMountedTemp");
+        query = query.arg("path", path.into());
+        if let Some(size) = opts.size {
+            query = query.arg("size", size);
+        }
+        if let Some(expand) = opts.expand {
+            query = query.arg("expand", expand);
+        }
         Container {
             proc: self.proc.clone(),
             selection: query,
@@ -2965,6 +3203,9 @@ impl Container {
         }
         if let Some(owner) = opts.owner {
             query = query.arg("owner", owner);
+        }
+        if let Some(expand) = opts.expand {
+            query = query.arg("expand", expand);
         }
         Container {
             proc: self.proc.clone(),
@@ -3130,6 +3371,9 @@ impl Container {
         if let Some(owner) = opts.owner {
             query = query.arg("owner", owner);
         }
+        if let Some(expand) = opts.expand {
+            query = query.arg("expand", expand);
+        }
         Container {
             proc: self.proc.clone(),
             selection: query,
@@ -3155,9 +3399,46 @@ impl Container {
     /// # Arguments
     ///
     /// * `path` - The path to set as the working directory (e.g., "/app").
+    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
     pub fn with_workdir(&self, path: impl Into<String>) -> Container {
         let mut query = self.selection.select("withWorkdir");
         query = query.arg("path", path.into());
+        Container {
+            proc: self.proc.clone(),
+            selection: query,
+            graphql_client: self.graphql_client.clone(),
+        }
+    }
+    /// Retrieves this container with a different working directory.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The path to set as the working directory (e.g., "/app").
+    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
+    pub fn with_workdir_opts(
+        &self,
+        path: impl Into<String>,
+        opts: ContainerWithWorkdirOpts,
+    ) -> Container {
+        let mut query = self.selection.select("withWorkdir");
+        query = query.arg("path", path.into());
+        if let Some(expand) = opts.expand {
+            query = query.arg("expand", expand);
+        }
+        Container {
+            proc: self.proc.clone(),
+            selection: query,
+            graphql_client: self.graphql_client.clone(),
+        }
+    }
+    /// Retrieves this container minus the given OCI annotation.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The name of the annotation.
+    pub fn without_annotation(&self, name: impl Into<String>) -> Container {
+        let mut query = self.selection.select("withoutAnnotation");
+        query = query.arg("name", name.into());
         Container {
             proc: self.proc.clone(),
             selection: query,
@@ -3178,9 +3459,32 @@ impl Container {
     /// # Arguments
     ///
     /// * `path` - Location of the directory to remove (e.g., ".github/").
+    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
     pub fn without_directory(&self, path: impl Into<String>) -> Container {
         let mut query = self.selection.select("withoutDirectory");
         query = query.arg("path", path.into());
+        Container {
+            proc: self.proc.clone(),
+            selection: query,
+            graphql_client: self.graphql_client.clone(),
+        }
+    }
+    /// Retrieves this container with the directory at the given path removed.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Location of the directory to remove (e.g., ".github/").
+    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
+    pub fn without_directory_opts(
+        &self,
+        path: impl Into<String>,
+        opts: ContainerWithoutDirectoryOpts,
+    ) -> Container {
+        let mut query = self.selection.select("withoutDirectory");
+        query = query.arg("path", path.into());
+        if let Some(expand) = opts.expand {
+            query = query.arg("expand", expand);
+        }
         Container {
             proc: self.proc.clone(),
             selection: query,
@@ -3272,9 +3576,75 @@ impl Container {
     /// # Arguments
     ///
     /// * `path` - Location of the file to remove (e.g., "/file.txt").
+    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
     pub fn without_file(&self, path: impl Into<String>) -> Container {
         let mut query = self.selection.select("withoutFile");
         query = query.arg("path", path.into());
+        Container {
+            proc: self.proc.clone(),
+            selection: query,
+            graphql_client: self.graphql_client.clone(),
+        }
+    }
+    /// Retrieves this container with the file at the given path removed.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Location of the file to remove (e.g., "/file.txt").
+    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
+    pub fn without_file_opts(
+        &self,
+        path: impl Into<String>,
+        opts: ContainerWithoutFileOpts,
+    ) -> Container {
+        let mut query = self.selection.select("withoutFile");
+        query = query.arg("path", path.into());
+        if let Some(expand) = opts.expand {
+            query = query.arg("expand", expand);
+        }
+        Container {
+            proc: self.proc.clone(),
+            selection: query,
+            graphql_client: self.graphql_client.clone(),
+        }
+    }
+    /// Retrieves this container with the files at the given paths removed.
+    ///
+    /// # Arguments
+    ///
+    /// * `paths` - Location of the files to remove (e.g., ["/file.txt"]).
+    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
+    pub fn without_files(&self, paths: Vec<impl Into<String>>) -> Container {
+        let mut query = self.selection.select("withoutFiles");
+        query = query.arg(
+            "paths",
+            paths.into_iter().map(|i| i.into()).collect::<Vec<String>>(),
+        );
+        Container {
+            proc: self.proc.clone(),
+            selection: query,
+            graphql_client: self.graphql_client.clone(),
+        }
+    }
+    /// Retrieves this container with the files at the given paths removed.
+    ///
+    /// # Arguments
+    ///
+    /// * `paths` - Location of the files to remove (e.g., ["/file.txt"]).
+    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
+    pub fn without_files_opts(
+        &self,
+        paths: Vec<impl Into<String>>,
+        opts: ContainerWithoutFilesOpts,
+    ) -> Container {
+        let mut query = self.selection.select("withoutFiles");
+        query = query.arg(
+            "paths",
+            paths.into_iter().map(|i| i.into()).collect::<Vec<String>>(),
+        );
+        if let Some(expand) = opts.expand {
+            query = query.arg("expand", expand);
+        }
         Container {
             proc: self.proc.clone(),
             selection: query,
@@ -3310,9 +3680,32 @@ impl Container {
     /// # Arguments
     ///
     /// * `path` - Location of the cache directory (e.g., "/cache/node_modules").
+    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
     pub fn without_mount(&self, path: impl Into<String>) -> Container {
         let mut query = self.selection.select("withoutMount");
         query = query.arg("path", path.into());
+        Container {
+            proc: self.proc.clone(),
+            selection: query,
+            graphql_client: self.graphql_client.clone(),
+        }
+    }
+    /// Retrieves this container after unmounting everything at the given path.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Location of the cache directory (e.g., "/cache/node_modules").
+    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
+    pub fn without_mount_opts(
+        &self,
+        path: impl Into<String>,
+        opts: ContainerWithoutMountOpts,
+    ) -> Container {
+        let mut query = self.selection.select("withoutMount");
+        query = query.arg("path", path.into());
+        if let Some(expand) = opts.expand {
+            query = query.arg("expand", expand);
+        }
         Container {
             proc: self.proc.clone(),
             selection: query,
@@ -3354,9 +3747,32 @@ impl Container {
     /// # Arguments
     ///
     /// * `path` - Location of the socket to remove (e.g., "/tmp/socket").
+    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
     pub fn without_unix_socket(&self, path: impl Into<String>) -> Container {
         let mut query = self.selection.select("withoutUnixSocket");
         query = query.arg("path", path.into());
+        Container {
+            proc: self.proc.clone(),
+            selection: query,
+            graphql_client: self.graphql_client.clone(),
+        }
+    }
+    /// Retrieves this container with a previously added Unix socket removed.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Location of the socket to remove (e.g., "/tmp/socket").
+    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
+    pub fn without_unix_socket_opts(
+        &self,
+        path: impl Into<String>,
+        opts: ContainerWithoutUnixSocketOpts,
+    ) -> Container {
+        let mut query = self.selection.select("withoutUnixSocket");
+        query = query.arg("path", path.into());
+        if let Some(expand) = opts.expand {
+            query = query.arg("expand", expand);
+        }
         Container {
             proc: self.proc.clone(),
             selection: query,
@@ -3527,9 +3943,23 @@ impl DaggerEngineCache {
         let query = self.selection.select("keepBytes");
         query.execute(self.graphql_client.clone()).await
     }
+    /// The maximum bytes to keep in the cache without pruning.
+    pub async fn max_used_space(&self) -> Result<isize, DaggerError> {
+        let query = self.selection.select("maxUsedSpace");
+        query.execute(self.graphql_client.clone()).await
+    }
+    /// The target amount of free disk space the garbage collector will attempt to leave.
+    pub async fn min_free_space(&self) -> Result<isize, DaggerError> {
+        let query = self.selection.select("minFreeSpace");
+        query.execute(self.graphql_client.clone()).await
+    }
     /// Prune the cache of releaseable entries
     pub async fn prune(&self) -> Result<Void, DaggerError> {
         let query = self.selection.select("prune");
+        query.execute(self.graphql_client.clone()).await
+    }
+    pub async fn reserved_space(&self) -> Result<isize, DaggerError> {
+        let query = self.selection.select("reservedSpace");
         query.execute(self.graphql_client.clone()).await
     }
 }
@@ -3652,15 +4082,6 @@ pub struct DirectoryExportOpts {
     pub wipe: Option<bool>,
 }
 #[derive(Builder, Debug, PartialEq)]
-pub struct DirectoryPipelineOpts<'a> {
-    /// Description of the sub-pipeline.
-    #[builder(setter(into, strip_option), default)]
-    pub description: Option<&'a str>,
-    /// Labels to apply to the sub-pipeline.
-    #[builder(setter(into, strip_option), default)]
-    pub labels: Option<Vec<PipelineLabel>>,
-}
-#[derive(Builder, Debug, PartialEq)]
 pub struct DirectoryTerminalOpts<'a> {
     /// If set, override the container's default terminal command and invoke these command arguments instead.
     #[builder(setter(into, strip_option), default)]
@@ -3761,6 +4182,11 @@ impl Directory {
             selection: query,
             graphql_client: self.graphql_client.clone(),
         }
+    }
+    /// Return the directory's digest. The format of the digest is not guaranteed to be stable between releases of Dagger. It is guaranteed to be stable between invocations of the same Dagger engine.
+    pub async fn digest(&self) -> Result<String, DaggerError> {
+        let query = self.selection.select("digest");
+        query.execute(self.graphql_client.clone()).await
     }
     /// Retrieves a directory at the given path.
     ///
@@ -3898,46 +4324,6 @@ impl Directory {
     pub async fn id(&self) -> Result<DirectoryId, DaggerError> {
         let query = self.selection.select("id");
         query.execute(self.graphql_client.clone()).await
-    }
-    /// Creates a named sub-pipeline.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - Name of the sub-pipeline.
-    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
-    pub fn pipeline(&self, name: impl Into<String>) -> Directory {
-        let mut query = self.selection.select("pipeline");
-        query = query.arg("name", name.into());
-        Directory {
-            proc: self.proc.clone(),
-            selection: query,
-            graphql_client: self.graphql_client.clone(),
-        }
-    }
-    /// Creates a named sub-pipeline.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - Name of the sub-pipeline.
-    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
-    pub fn pipeline_opts<'a>(
-        &self,
-        name: impl Into<String>,
-        opts: DirectoryPipelineOpts<'a>,
-    ) -> Directory {
-        let mut query = self.selection.select("pipeline");
-        query = query.arg("name", name.into());
-        if let Some(description) = opts.description {
-            query = query.arg("description", description);
-        }
-        if let Some(labels) = opts.labels {
-            query = query.arg("labels", labels);
-        }
-        Directory {
-            proc: self.proc.clone(),
-            selection: query,
-            graphql_client: self.graphql_client.clone(),
-        }
     }
     /// Force evaluation in the engine.
     pub async fn sync(&self) -> Result<DirectoryId, DaggerError> {
@@ -4265,6 +4651,23 @@ impl Directory {
             graphql_client: self.graphql_client.clone(),
         }
     }
+    /// Retrieves this directory with the files at the given paths removed.
+    ///
+    /// # Arguments
+    ///
+    /// * `paths` - Location of the file to remove (e.g., ["/file.txt"]).
+    pub fn without_files(&self, paths: Vec<impl Into<String>>) -> Directory {
+        let mut query = self.selection.select("withoutFiles");
+        query = query.arg(
+            "paths",
+            paths.into_iter().map(|i| i.into()).collect::<Vec<String>>(),
+        );
+        Directory {
+            proc: self.proc.clone(),
+            selection: query,
+            graphql_client: self.graphql_client.clone(),
+        }
+    }
 }
 #[derive(Clone)]
 pub struct EnumTypeDef {
@@ -4287,6 +4690,15 @@ impl EnumTypeDef {
     pub async fn name(&self) -> Result<String, DaggerError> {
         let query = self.selection.select("name");
         query.execute(self.graphql_client.clone()).await
+    }
+    /// The location of this enum declaration.
+    pub fn source_map(&self) -> SourceMap {
+        let query = self.selection.select("sourceMap");
+        SourceMap {
+            proc: self.proc.clone(),
+            selection: query,
+            graphql_client: self.graphql_client.clone(),
+        }
     }
     /// If this EnumTypeDef is associated with a Module, the name of the module. Unset otherwise.
     pub async fn source_module_name(&self) -> Result<String, DaggerError> {
@@ -4324,6 +4736,15 @@ impl EnumValueTypeDef {
     pub async fn name(&self) -> Result<String, DaggerError> {
         let query = self.selection.select("name");
         query.execute(self.graphql_client.clone()).await
+    }
+    /// The location of this enum value declaration.
+    pub fn source_map(&self) -> SourceMap {
+        let query = self.selection.select("sourceMap");
+        SourceMap {
+            proc: self.proc.clone(),
+            selection: query,
+            graphql_client: self.graphql_client.clone(),
+        }
     }
 }
 #[derive(Clone)]
@@ -4371,6 +4792,15 @@ impl FieldTypeDef {
         let query = self.selection.select("name");
         query.execute(self.graphql_client.clone()).await
     }
+    /// The location of this field declaration.
+    pub fn source_map(&self) -> SourceMap {
+        let query = self.selection.select("sourceMap");
+        SourceMap {
+            proc: self.proc.clone(),
+            selection: query,
+            graphql_client: self.graphql_client.clone(),
+        }
+    }
     /// The type of the field.
     pub fn type_def(&self) -> TypeDef {
         let query = self.selection.select("typeDef");
@@ -4388,6 +4818,12 @@ pub struct File {
     pub graphql_client: DynGraphQLClient,
 }
 #[derive(Builder, Debug, PartialEq)]
+pub struct FileDigestOpts {
+    /// If true, exclude metadata from the digest.
+    #[builder(setter(into, strip_option), default)]
+    pub exclude_metadata: Option<bool>,
+}
+#[derive(Builder, Debug, PartialEq)]
 pub struct FileExportOpts {
     /// If allowParentDirPath is true, the path argument can be a directory path, in which case the file will be created in that directory.
     #[builder(setter(into, strip_option), default)]
@@ -4397,6 +4833,27 @@ impl File {
     /// Retrieves the contents of the file.
     pub async fn contents(&self) -> Result<String, DaggerError> {
         let query = self.selection.select("contents");
+        query.execute(self.graphql_client.clone()).await
+    }
+    /// Return the file's digest. The format of the digest is not guaranteed to be stable between releases of Dagger. It is guaranteed to be stable between invocations of the same Dagger engine.
+    ///
+    /// # Arguments
+    ///
+    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
+    pub async fn digest(&self) -> Result<String, DaggerError> {
+        let query = self.selection.select("digest");
+        query.execute(self.graphql_client.clone()).await
+    }
+    /// Return the file's digest. The format of the digest is not guaranteed to be stable between releases of Dagger. It is guaranteed to be stable between invocations of the same Dagger engine.
+    ///
+    /// # Arguments
+    ///
+    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
+    pub async fn digest_opts(&self, opts: FileDigestOpts) -> Result<String, DaggerError> {
+        let mut query = self.selection.select("digest");
+        if let Some(exclude_metadata) = opts.exclude_metadata {
+            query = query.arg("excludeMetadata", exclude_metadata);
+        }
         query.execute(self.graphql_client.clone()).await
     }
     /// Writes the file to a file path on the host.
@@ -4487,12 +4944,20 @@ pub struct Function {
 }
 #[derive(Builder, Debug, PartialEq)]
 pub struct FunctionWithArgOpts<'a> {
+    /// If the argument is a Directory or File type, default to load path from context directory, relative to root directory.
+    #[builder(setter(into, strip_option), default)]
+    pub default_path: Option<&'a str>,
     /// A default value to use for this argument if not explicitly set by the caller, if any
     #[builder(setter(into, strip_option), default)]
     pub default_value: Option<Json>,
     /// A doc string for the argument, if any
     #[builder(setter(into, strip_option), default)]
     pub description: Option<&'a str>,
+    /// Patterns to ignore when loading the contextual argument value.
+    #[builder(setter(into, strip_option), default)]
+    pub ignore: Option<Vec<&'a str>>,
+    #[builder(setter(into, strip_option), default)]
+    pub source_map: Option<SourceMapId>,
 }
 impl Function {
     /// Arguments accepted by the function, if any.
@@ -4523,6 +4988,15 @@ impl Function {
     pub fn return_type(&self) -> TypeDef {
         let query = self.selection.select("returnType");
         TypeDef {
+            proc: self.proc.clone(),
+            selection: query,
+            graphql_client: self.graphql_client.clone(),
+        }
+    }
+    /// The location of this function declaration.
+    pub fn source_map(&self) -> SourceMap {
+        let query = self.selection.select("sourceMap");
+        SourceMap {
             proc: self.proc.clone(),
             selection: query,
             graphql_client: self.graphql_client.clone(),
@@ -4579,6 +5053,15 @@ impl Function {
         if let Some(default_value) = opts.default_value {
             query = query.arg("defaultValue", default_value);
         }
+        if let Some(default_path) = opts.default_path {
+            query = query.arg("defaultPath", default_path);
+        }
+        if let Some(ignore) = opts.ignore {
+            query = query.arg("ignore", ignore);
+        }
+        if let Some(source_map) = opts.source_map {
+            query = query.arg("sourceMap", source_map);
+        }
         Function {
             proc: self.proc.clone(),
             selection: query,
@@ -4599,6 +5082,26 @@ impl Function {
             graphql_client: self.graphql_client.clone(),
         }
     }
+    /// Returns the function with the given source map.
+    ///
+    /// # Arguments
+    ///
+    /// * `source_map` - The source map for the function definition.
+    pub fn with_source_map(&self, source_map: impl IntoID<SourceMapId>) -> Function {
+        let mut query = self.selection.select("withSourceMap");
+        query = query.arg_lazy(
+            "sourceMap",
+            Box::new(move || {
+                let source_map = source_map.clone();
+                Box::pin(async move { source_map.into_id().await.unwrap().quote() })
+            }),
+        );
+        Function {
+            proc: self.proc.clone(),
+            selection: query,
+            graphql_client: self.graphql_client.clone(),
+        }
+    }
 }
 #[derive(Clone)]
 pub struct FunctionArg {
@@ -4607,6 +5110,11 @@ pub struct FunctionArg {
     pub graphql_client: DynGraphQLClient,
 }
 impl FunctionArg {
+    /// Only applies to arguments of type File or Directory. If the argument is not set, load it from the given path in the context directory
+    pub async fn default_path(&self) -> Result<String, DaggerError> {
+        let query = self.selection.select("defaultPath");
+        query.execute(self.graphql_client.clone()).await
+    }
     /// A default value to use for this argument when not explicitly set by the caller, if any.
     pub async fn default_value(&self) -> Result<Json, DaggerError> {
         let query = self.selection.select("defaultValue");
@@ -4622,10 +5130,24 @@ impl FunctionArg {
         let query = self.selection.select("id");
         query.execute(self.graphql_client.clone()).await
     }
+    /// Only applies to arguments of type Directory. The ignore patterns are applied to the input directory, and matching entries are filtered out, in a cache-efficient manner.
+    pub async fn ignore(&self) -> Result<Vec<String>, DaggerError> {
+        let query = self.selection.select("ignore");
+        query.execute(self.graphql_client.clone()).await
+    }
     /// The name of the argument in lowerCamelCase format.
     pub async fn name(&self) -> Result<String, DaggerError> {
         let query = self.selection.select("name");
         query.execute(self.graphql_client.clone()).await
+    }
+    /// The location of this arg declaration.
+    pub fn source_map(&self) -> SourceMap {
+        let query = self.selection.select("sourceMap");
+        SourceMap {
+            proc: self.proc.clone(),
+            selection: query,
+            graphql_client: self.graphql_client.clone(),
+        }
     }
     /// The type of the argument.
     pub fn type_def(&self) -> TypeDef {
@@ -4772,9 +5294,9 @@ pub struct GitModuleSource {
     pub graphql_client: DynGraphQLClient,
 }
 impl GitModuleSource {
-    /// The URL to clone the root of the git repo from
-    pub async fn clone_url(&self) -> Result<String, DaggerError> {
-        let query = self.selection.select("cloneURL");
+    /// The ref to clone the root of the git repo from
+    pub async fn clone_ref(&self) -> Result<String, DaggerError> {
+        let query = self.selection.select("cloneRef");
         query.execute(self.graphql_client.clone()).await
     }
     /// The resolved commit of the git repo this source points to.
@@ -4790,6 +5312,11 @@ impl GitModuleSource {
             selection: query,
             graphql_client: self.graphql_client.clone(),
         }
+    }
+    /// The URL to access the web view of the repository (e.g., GitHub, GitLab, Bitbucket)
+    pub async fn html_repo_url(&self) -> Result<String, DaggerError> {
+        let query = self.selection.select("htmlRepoURL");
+        query.execute(self.graphql_client.clone()).await
     }
     /// The URL to the source's git repo in a web browser
     pub async fn html_url(&self) -> Result<String, DaggerError> {
@@ -4823,6 +5350,12 @@ pub struct GitRef {
     pub selection: Selection,
     pub graphql_client: DynGraphQLClient,
 }
+#[derive(Builder, Debug, PartialEq)]
+pub struct GitRefTreeOpts {
+    /// Set to true to discard .git directory.
+    #[builder(setter(into, strip_option), default)]
+    pub discard_git_dir: Option<bool>,
+}
 impl GitRef {
     /// The resolved commit id at this ref.
     pub async fn commit(&self) -> Result<String, DaggerError> {
@@ -4835,8 +5368,28 @@ impl GitRef {
         query.execute(self.graphql_client.clone()).await
     }
     /// The filesystem tree at this ref.
+    ///
+    /// # Arguments
+    ///
+    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
     pub fn tree(&self) -> Directory {
         let query = self.selection.select("tree");
+        Directory {
+            proc: self.proc.clone(),
+            selection: query,
+            graphql_client: self.graphql_client.clone(),
+        }
+    }
+    /// The filesystem tree at this ref.
+    ///
+    /// # Arguments
+    ///
+    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
+    pub fn tree_opts(&self, opts: GitRefTreeOpts) -> Directory {
+        let mut query = self.selection.select("tree");
+        if let Some(discard_git_dir) = opts.discard_git_dir {
+            query = query.arg("discardGitDir", discard_git_dir);
+        }
         Directory {
             proc: self.proc.clone(),
             selection: query,
@@ -5265,6 +5818,15 @@ impl InterfaceTypeDef {
         let query = self.selection.select("name");
         query.execute(self.graphql_client.clone()).await
     }
+    /// The location of this interface declaration.
+    pub fn source_map(&self) -> SourceMap {
+        let query = self.selection.select("sourceMap");
+        SourceMap {
+            proc: self.proc.clone(),
+            selection: query,
+            graphql_client: self.graphql_client.clone(),
+        }
+    }
     /// If this InterfaceTypeDef is associated with a Module, the name of the module. Unset otherwise.
     pub async fn source_module_name(&self) -> Result<String, DaggerError> {
         let query = self.selection.select("sourceModuleName");
@@ -5335,6 +5897,11 @@ impl LocalModuleSource {
     /// A unique identifier for this LocalModuleSource.
     pub async fn id(&self) -> Result<LocalModuleSourceId, DaggerError> {
         let query = self.selection.select("id");
+        query.execute(self.graphql_client.clone()).await
+    }
+    /// The relative path to the module root from the host directory
+    pub async fn rel_host_path(&self) -> Result<String, DaggerError> {
+        let query = self.selection.select("relHostPath");
         query.execute(self.graphql_client.clone()).await
     }
     /// The path to the root of the module source under the context directory. This directory contains its configuration file. It also contains its source code (possibly as a subdirectory).
@@ -5625,9 +6192,18 @@ pub struct ModuleSourceAsModuleOpts<'a> {
 }
 #[derive(Builder, Debug, PartialEq)]
 pub struct ModuleSourceResolveDirectoryFromCallerOpts<'a> {
+    /// Patterns to ignore when loading the directory.
+    #[builder(setter(into, strip_option), default)]
+    pub ignore: Option<Vec<&'a str>>,
     /// If set, the name of the view to apply to the path.
     #[builder(setter(into, strip_option), default)]
     pub view_name: Option<&'a str>,
+}
+#[derive(Builder, Debug, PartialEq)]
+pub struct ModuleSourceWithInitOpts {
+    /// Merge module dependencies into the current project's
+    #[builder(setter(into, strip_option), default)]
+    pub merge: Option<bool>,
 }
 impl ModuleSource {
     /// If the source is a of kind git, the git source representation of it.
@@ -5704,6 +6280,11 @@ impl ModuleSource {
             selection: query,
             graphql_client: self.graphql_client.clone(),
         }]
+    }
+    /// Return the module source's content digest. The format of the digest is not guaranteed to be stable between releases of Dagger. It is guaranteed to be stable between invocations of the same Dagger engine.
+    pub async fn digest(&self) -> Result<String, DaggerError> {
+        let query = self.selection.select("digest");
+        query.execute(self.graphql_client.clone()).await
     }
     /// The directory containing the module configuration and source code (source code may be in a subdir).
     ///
@@ -5795,6 +6376,9 @@ impl ModuleSource {
         if let Some(view_name) = opts.view_name {
             query = query.arg("viewName", view_name);
         }
+        if let Some(ignore) = opts.ignore {
+            query = query.arg("ignore", ignore);
+        }
         Directory {
             proc: self.proc.clone(),
             selection: query,
@@ -5871,6 +6455,35 @@ impl ModuleSource {
     pub fn with_dependencies(&self, dependencies: Vec<ModuleDependencyId>) -> ModuleSource {
         let mut query = self.selection.select("withDependencies");
         query = query.arg("dependencies", dependencies);
+        ModuleSource {
+            proc: self.proc.clone(),
+            selection: query,
+            graphql_client: self.graphql_client.clone(),
+        }
+    }
+    /// Sets module init arguments
+    ///
+    /// # Arguments
+    ///
+    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
+    pub fn with_init(&self) -> ModuleSource {
+        let query = self.selection.select("withInit");
+        ModuleSource {
+            proc: self.proc.clone(),
+            selection: query,
+            graphql_client: self.graphql_client.clone(),
+        }
+    }
+    /// Sets module init arguments
+    ///
+    /// # Arguments
+    ///
+    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
+    pub fn with_init_opts(&self, opts: ModuleSourceWithInitOpts) -> ModuleSource {
+        let mut query = self.selection.select("withInit");
+        if let Some(merge) = opts.merge {
+            query = query.arg("merge", merge);
+        }
         ModuleSource {
             proc: self.proc.clone(),
             selection: query,
@@ -6018,6 +6631,15 @@ impl ObjectTypeDef {
         let query = self.selection.select("name");
         query.execute(self.graphql_client.clone()).await
     }
+    /// The location of this object declaration.
+    pub fn source_map(&self) -> SourceMap {
+        let query = self.selection.select("sourceMap");
+        SourceMap {
+            proc: self.proc.clone(),
+            selection: query,
+            graphql_client: self.graphql_client.clone(),
+        }
+    }
     /// If this ObjectTypeDef is associated with a Module, the name of the module. Unset otherwise.
     pub async fn source_module_name(&self) -> Result<String, DaggerError> {
         let query = self.selection.select("sourceModuleName");
@@ -6074,7 +6696,7 @@ pub struct QueryGitOpts<'a> {
     /// A service which must be started before the repo is fetched.
     #[builder(setter(into, strip_option), default)]
     pub experimental_service_host: Option<ServiceId>,
-    /// Set to true to keep .git directory.
+    /// DEPRECATED: Set to true to keep .git directory.
     #[builder(setter(into, strip_option), default)]
     pub keep_git_dir: Option<bool>,
     /// Set SSH auth socket
@@ -6097,19 +6719,16 @@ pub struct QueryModuleDependencyOpts<'a> {
     pub name: Option<&'a str>,
 }
 #[derive(Builder, Debug, PartialEq)]
-pub struct QueryModuleSourceOpts {
+pub struct QueryModuleSourceOpts<'a> {
+    /// The pinned version of the module source
+    #[builder(setter(into, strip_option), default)]
+    pub ref_pin: Option<&'a str>,
+    /// The relative path to the module root from the host directory
+    #[builder(setter(into, strip_option), default)]
+    pub rel_host_path: Option<&'a str>,
     /// If true, enforce that the source is a stable version for source kinds that support versioning.
     #[builder(setter(into, strip_option), default)]
     pub stable: Option<bool>,
-}
-#[derive(Builder, Debug, PartialEq)]
-pub struct QueryPipelineOpts<'a> {
-    /// Description of the sub-pipeline.
-    #[builder(setter(into, strip_option), default)]
-    pub description: Option<&'a str>,
-    /// Labels to apply to the sub-pipeline.
-    #[builder(setter(into, strip_option), default)]
-    pub labels: Option<Vec<PipelineLabel>>,
 }
 #[derive(Builder, Debug, PartialEq)]
 pub struct QuerySecretOpts<'a> {
@@ -7009,6 +7628,22 @@ impl Query {
             graphql_client: self.graphql_client.clone(),
         }
     }
+    /// Load a SourceMap from its ID.
+    pub fn load_source_map_from_id(&self, id: impl IntoID<SourceMapId>) -> SourceMap {
+        let mut query = self.selection.select("loadSourceMapFromID");
+        query = query.arg_lazy(
+            "id",
+            Box::new(move || {
+                let id = id.clone();
+                Box::pin(async move { id.into_id().await.unwrap().quote() })
+            }),
+        );
+        SourceMap {
+            proc: self.proc.clone(),
+            selection: query,
+            graphql_client: self.graphql_client.clone(),
+        }
+    }
     /// Load a Terminal from its ID.
     pub fn load_terminal_from_id(&self, id: impl IntoID<TerminalId>) -> Terminal {
         let mut query = self.selection.select("loadTerminalFromID");
@@ -7120,53 +7755,23 @@ impl Query {
     ///
     /// * `ref_string` - The string ref representation of the module source
     /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
-    pub fn module_source_opts(
+    pub fn module_source_opts<'a>(
         &self,
         ref_string: impl Into<String>,
-        opts: QueryModuleSourceOpts,
+        opts: QueryModuleSourceOpts<'a>,
     ) -> ModuleSource {
         let mut query = self.selection.select("moduleSource");
         query = query.arg("refString", ref_string.into());
+        if let Some(ref_pin) = opts.ref_pin {
+            query = query.arg("refPin", ref_pin);
+        }
         if let Some(stable) = opts.stable {
             query = query.arg("stable", stable);
         }
+        if let Some(rel_host_path) = opts.rel_host_path {
+            query = query.arg("relHostPath", rel_host_path);
+        }
         ModuleSource {
-            proc: self.proc.clone(),
-            selection: query,
-            graphql_client: self.graphql_client.clone(),
-        }
-    }
-    /// Creates a named sub-pipeline.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - Name of the sub-pipeline.
-    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
-    pub fn pipeline(&self, name: impl Into<String>) -> Query {
-        let mut query = self.selection.select("pipeline");
-        query = query.arg("name", name.into());
-        Query {
-            proc: self.proc.clone(),
-            selection: query,
-            graphql_client: self.graphql_client.clone(),
-        }
-    }
-    /// Creates a named sub-pipeline.
-    ///
-    /// # Arguments
-    ///
-    /// * `name` - Name of the sub-pipeline.
-    /// * `opt` - optional argument, see inner type for documentation, use <func>_opts to use
-    pub fn pipeline_opts<'a>(&self, name: impl Into<String>, opts: QueryPipelineOpts<'a>) -> Query {
-        let mut query = self.selection.select("pipeline");
-        query = query.arg("name", name.into());
-        if let Some(description) = opts.description {
-            query = query.arg("description", description);
-        }
-        if let Some(labels) = opts.labels {
-            query = query.arg("labels", labels);
-        }
-        Query {
             proc: self.proc.clone(),
             selection: query,
             graphql_client: self.graphql_client.clone(),
@@ -7215,6 +7820,24 @@ impl Query {
         query = query.arg("name", name.into());
         query = query.arg("plaintext", plaintext.into());
         Secret {
+            proc: self.proc.clone(),
+            selection: query,
+            graphql_client: self.graphql_client.clone(),
+        }
+    }
+    /// Creates source map metadata.
+    ///
+    /// # Arguments
+    ///
+    /// * `filename` - The filename from the module source.
+    /// * `line` - The line number within the filename.
+    /// * `column` - The column number within the line.
+    pub fn source_map(&self, filename: impl Into<String>, line: isize, column: isize) -> SourceMap {
+        let mut query = self.selection.select("sourceMap");
+        query = query.arg("filename", filename.into());
+        query = query.arg("line", line);
+        query = query.arg("column", column);
+        SourceMap {
             proc: self.proc.clone(),
             selection: query,
             graphql_client: self.graphql_client.clone(),
@@ -7419,6 +8042,20 @@ impl Service {
         }
         query.execute(self.graphql_client.clone()).await
     }
+    /// Configures a hostname which can be used by clients within the session to reach this container.
+    ///
+    /// # Arguments
+    ///
+    /// * `hostname` - The hostname to use.
+    pub fn with_hostname(&self, hostname: impl Into<String>) -> Service {
+        let mut query = self.selection.select("withHostname");
+        query = query.arg("hostname", hostname.into());
+        Service {
+            proc: self.proc.clone(),
+            selection: query,
+            graphql_client: self.graphql_client.clone(),
+        }
+    }
 }
 #[derive(Clone)]
 pub struct Socket {
@@ -7430,6 +8067,39 @@ impl Socket {
     /// A unique identifier for this Socket.
     pub async fn id(&self) -> Result<SocketId, DaggerError> {
         let query = self.selection.select("id");
+        query.execute(self.graphql_client.clone()).await
+    }
+}
+#[derive(Clone)]
+pub struct SourceMap {
+    pub proc: Option<Arc<DaggerSessionProc>>,
+    pub selection: Selection,
+    pub graphql_client: DynGraphQLClient,
+}
+impl SourceMap {
+    /// The column number within the line.
+    pub async fn column(&self) -> Result<isize, DaggerError> {
+        let query = self.selection.select("column");
+        query.execute(self.graphql_client.clone()).await
+    }
+    /// The filename from the module source.
+    pub async fn filename(&self) -> Result<String, DaggerError> {
+        let query = self.selection.select("filename");
+        query.execute(self.graphql_client.clone()).await
+    }
+    /// A unique identifier for this SourceMap.
+    pub async fn id(&self) -> Result<SourceMapId, DaggerError> {
+        let query = self.selection.select("id");
+        query.execute(self.graphql_client.clone()).await
+    }
+    /// The line number within the filename.
+    pub async fn line(&self) -> Result<isize, DaggerError> {
+        let query = self.selection.select("line");
+        query.execute(self.graphql_client.clone()).await
+    }
+    /// The module dependency this was declared in.
+    pub async fn module(&self) -> Result<String, DaggerError> {
+        let query = self.selection.select("module");
         query.execute(self.graphql_client.clone()).await
     }
 }
@@ -7463,28 +8133,41 @@ pub struct TypeDefWithEnumOpts<'a> {
     /// A doc string for the enum, if any
     #[builder(setter(into, strip_option), default)]
     pub description: Option<&'a str>,
+    /// The source map for the enum definition.
+    #[builder(setter(into, strip_option), default)]
+    pub source_map: Option<SourceMapId>,
 }
 #[derive(Builder, Debug, PartialEq)]
 pub struct TypeDefWithEnumValueOpts<'a> {
     /// A doc string for the value, if any
     #[builder(setter(into, strip_option), default)]
     pub description: Option<&'a str>,
+    /// The source map for the enum value definition.
+    #[builder(setter(into, strip_option), default)]
+    pub source_map: Option<SourceMapId>,
 }
 #[derive(Builder, Debug, PartialEq)]
 pub struct TypeDefWithFieldOpts<'a> {
     /// A doc string for the field, if any
     #[builder(setter(into, strip_option), default)]
     pub description: Option<&'a str>,
+    /// The source map for the field definition.
+    #[builder(setter(into, strip_option), default)]
+    pub source_map: Option<SourceMapId>,
 }
 #[derive(Builder, Debug, PartialEq)]
 pub struct TypeDefWithInterfaceOpts<'a> {
     #[builder(setter(into, strip_option), default)]
     pub description: Option<&'a str>,
+    #[builder(setter(into, strip_option), default)]
+    pub source_map: Option<SourceMapId>,
 }
 #[derive(Builder, Debug, PartialEq)]
 pub struct TypeDefWithObjectOpts<'a> {
     #[builder(setter(into, strip_option), default)]
     pub description: Option<&'a str>,
+    #[builder(setter(into, strip_option), default)]
+    pub source_map: Option<SourceMapId>,
 }
 #[derive(Builder, Debug, PartialEq)]
 pub struct TypeDefWithScalarOpts<'a> {
@@ -7610,6 +8293,9 @@ impl TypeDef {
         if let Some(description) = opts.description {
             query = query.arg("description", description);
         }
+        if let Some(source_map) = opts.source_map {
+            query = query.arg("sourceMap", source_map);
+        }
         TypeDef {
             proc: self.proc.clone(),
             selection: query,
@@ -7646,6 +8332,9 @@ impl TypeDef {
         query = query.arg("value", value.into());
         if let Some(description) = opts.description {
             query = query.arg("description", description);
+        }
+        if let Some(source_map) = opts.source_map {
+            query = query.arg("sourceMap", source_map);
         }
         TypeDef {
             proc: self.proc.clone(),
@@ -7701,6 +8390,9 @@ impl TypeDef {
         if let Some(description) = opts.description {
             query = query.arg("description", description);
         }
+        if let Some(source_map) = opts.source_map {
+            query = query.arg("sourceMap", source_map);
+        }
         TypeDef {
             proc: self.proc.clone(),
             selection: query,
@@ -7751,6 +8443,9 @@ impl TypeDef {
         query = query.arg("name", name.into());
         if let Some(description) = opts.description {
             query = query.arg("description", description);
+        }
+        if let Some(source_map) = opts.source_map {
+            query = query.arg("sourceMap", source_map);
         }
         TypeDef {
             proc: self.proc.clone(),
@@ -7814,6 +8509,9 @@ impl TypeDef {
         query = query.arg("name", name.into());
         if let Some(description) = opts.description {
             query = query.arg("description", description);
+        }
+        if let Some(source_map) = opts.source_map {
+            query = query.arg("sourceMap", source_map);
         }
         TypeDef {
             proc: self.proc.clone(),
@@ -7907,6 +8605,15 @@ pub enum NetworkProtocol {
     Tcp,
     #[serde(rename = "UDP")]
     Udp,
+}
+#[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
+pub enum ReturnType {
+    #[serde(rename = "ANY")]
+    Any,
+    #[serde(rename = "FAILURE")]
+    Failure,
+    #[serde(rename = "SUCCESS")]
+    Success,
 }
 #[derive(Serialize, Deserialize, Clone, PartialEq, Debug)]
 pub enum TypeDefKind {
